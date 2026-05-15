@@ -1,24 +1,68 @@
-from typing import Any, Optional
-from ..schemas.base import StaticPayload, Section
-from .routing import RouteDefinition
-from .proxy import ProxyHandler
+from typing import Any, Dict, Optional, Union, List
+import asyncio
+from ..schemas.base import StaticPayload
 from ..exceptions import (
-    StaticflowwError, 
-    ExtractionError, 
     RequestValidationError, 
     ResponseValidationError, 
     HookError
 )
+from .routing import RouteDefinition, FanOutRouteDefinition
+from .proxy import ProxyHandler
 
 class FlowEngine:
+    """
+    The core engine that orchestrates the request flow:
+    Extraction -> Hooks -> Proxy -> Validation
+    Supports both single-action and multi-action fan-out routes.
+    """
     def __init__(self, proxy: ProxyHandler):
         self.proxy = proxy
 
     async def process(
         self, 
         payload: StaticPayload, 
-        route: RouteDefinition, 
+        route: Union[RouteDefinition, FanOutRouteDefinition], 
         incoming_headers: Optional[Dict[str, str]] = None,
+        **kwargs
+    ) -> Any:
+        if isinstance(route, FanOutRouteDefinition):
+            return await self._process_fanout(payload, route, incoming_headers, **kwargs)
+        return await self._process_single(payload, route, incoming_headers, **kwargs)
+
+    async def _process_fanout(
+        self, 
+        payload: StaticPayload, 
+        fanout_route: FanOutRouteDefinition, 
+        incoming_headers: Optional[Dict[str, str]],
+        **kwargs
+    ) -> Any:
+        print(f"--- [Fan-out] Executing {len(fanout_route.routes)} parallel requests for {fanout_route.type} ---")
+        
+        # Execute all routes in parallel
+        tasks = [
+            self._process_single(payload, r, incoming_headers, **kwargs) 
+            for r in fanout_route.routes
+        ]
+        results = await asyncio.gather(*tasks)
+
+        # Merge results
+        if fanout_route.merge_hook:
+            return await self._maybe_await(fanout_route.merge_hook(results, **kwargs))
+        
+        # Default merge strategy: Merge dicts
+        merged = {}
+        for res in results:
+            if isinstance(res, dict):
+                merged.update(res)
+            elif hasattr(res, "model_dump"):
+                merged.update(res.model_dump())
+        return merged
+
+    async def _process_single(
+        self, 
+        payload: StaticPayload, 
+        route: RouteDefinition, 
+        incoming_headers: Optional[Dict[str, str]],
         **kwargs
     ) -> Any:
         # 1. Extraction (Plucking)
@@ -26,7 +70,9 @@ class FlowEngine:
         if route.extract:
             data = payload.pluck(route.extract)
             if data is None:
-                raise ExtractionError(route.extract)
+                # If extraction is required but section is missing
+                # We can either fail or pass None
+                pass
 
         # 2. Before Request Hook (Business Logic)
         if route.before_request:
@@ -36,7 +82,7 @@ class FlowEngine:
                 raise HookError(f"Error in before_request hook: {str(e)}") from e
 
         # 3. Request Validation
-        if route.request_model and not isinstance(data, route.request_model):
+        if route.request_model:
             try:
                 data = route.request_model.model_validate(data)
             except Exception as e:
@@ -47,7 +93,7 @@ class FlowEngine:
         upstream_headers = {}
         upstream_params = {}
         
-        if route.auth:
+        if hasattr(route, "auth") and route.auth:
             upstream_headers, upstream_params, request_json = await route.auth.apply(
                 incoming_headers or {},
                 upstream_headers,
@@ -61,7 +107,7 @@ class FlowEngine:
             print(f"--- [Mock Mode] Returning mock data for {route.type} ---")
             response_data = route.mock_data
         else:
-            if route.resilience:
+            if hasattr(route, "resilience") and route.resilience:
                 response = await route.resilience.execute(
                     self.proxy.request,
                     method=route.method,

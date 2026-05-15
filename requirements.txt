@@ -1,3 +1,5 @@
 pydantic>=2.0.0
 httpx>=0.24.0
 motor>=3.1.0  # For MongoDB auditing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
