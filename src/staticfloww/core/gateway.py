@@ -55,7 +55,7 @@ class Gateway:
             return response_data
             
         except Exception as e:
-            # TODO: Log error to auditor
+            #: Log error to auditor
             raise e
 
     async def shutdown(self):

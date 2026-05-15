@@ -25,10 +25,14 @@ class ProxyHandler:
         params: Optional[Dict[str, Any]] = None
     ) -> httpx.Response:
         try:
+            # Only send JSON if there's actual data and it's not a GET request
+            # (or if specifically required)
+            send_json = json_data if method.upper() != "GET" else None
+            
             response = await self._client.request(
                 method=method,
                 url=path,
-                json=json_data,
+                json=send_json,
                 headers=headers,
                 params=params
             )

@@ -38,12 +38,22 @@ class FlowEngine:
     ) -> Any:
         print(f"--- [Fan-out] Executing {len(fanout_route.routes)} parallel requests for {fanout_route.action} ---")
         
-        # Execute all routes in parallel
-        tasks = [
-            self._process_single(payload, r, incoming_headers, **kwargs) 
-            for r in fanout_route.routes
-        ]
-        results = await asyncio.gather(*tasks)
+        # Concurrency control: prevent overwhelming upstream services
+        concurrency_limit = kwargs.get("max_concurrency", 20)
+        sem = asyncio.Semaphore(concurrency_limit)
+        
+        async def controlled_task(r):
+            async with sem:
+                return await self._process_single(payload, r, incoming_headers, **kwargs)
+
+        # Use TaskGroup for structured concurrency
+        # This ensures that if one task fails, the others are properly cleaned up.
+        tasks = []
+        async with asyncio.TaskGroup() as tg:
+            for r in fanout_route.routes:
+                tasks.append(tg.create_task(controlled_task(r)))
+        
+        results = [t.result() for t in tasks]
 
         # Merge results
         if fanout_route.merge_hook:
@@ -70,8 +80,6 @@ class FlowEngine:
         if route.extract:
             data = payload.pluck(route.extract)
             if data is None:
-                # If extraction is required but section is missing
-                # We can either fail or pass None
                 pass
 
         # 2. Before Request Hook (Business Logic)
@@ -93,12 +101,18 @@ class FlowEngine:
         upstream_headers = {}
         upstream_params = {}
         
+        # For GET requests, the 'data' is typically query parameters
+        if route.method.upper() == "GET" and isinstance(request_json, dict):
+            upstream_params.update(request_json)
+            request_json = None # No body for GET
+        
         if hasattr(route, "auth") and route.auth:
+            # Note: request_json might be None here for GET
             upstream_headers, upstream_params, request_json = await route.auth.apply(
                 incoming_headers or {},
                 upstream_headers,
                 upstream_params,
-                request_json,
+                request_json or {},
                 **kwargs
             )
 

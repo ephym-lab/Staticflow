@@ -5,12 +5,10 @@ class StaticflowwError(Exception):
         self.message = message
         self.status_code = status_code
 
-# --- Configuration & Setup ---
 class ConfigurationError(StaticflowwError):
     """Raised when the gateway is misconfigured."""
     pass
 
-# --- Routing & Extraction ---
 class RoutingError(StaticflowwError):
     """Base for routing related issues."""
     pass
@@ -25,7 +23,7 @@ class ExtractionError(StaticflowwError):
     def __init__(self, section_name: str):
         super().__init__(f"Required section '{section_name}' missing from payload", status_code=400)
 
-# --- Validation ---
+
 class ValidationError(StaticflowwError):
     """Base for validation issues."""
     pass
@@ -40,7 +38,7 @@ class ResponseValidationError(ValidationError):
     def __init__(self, details: str):
         super().__init__(f"Response validation failed: {details}", status_code=502)
 
-# --- Upstream / Proxy ---
+
 class ProxyError(StaticflowwError):
     """Base for upstream communication issues."""
     pass
@@ -60,12 +58,11 @@ class UpstreamResponseError(ProxyError):
     def __init__(self, status_code: int, details: str):
         super().__init__(f"Upstream returned error {status_code}: {details}", status_code=status_code)
 
-# --- Hooks & Logic ---
+
 class HookError(StaticflowwError):
     """Raised when a before_request or after_response hook fails."""
     pass
 
-# --- Authentication ---
 class AuthError(StaticflowwError):
     """Raised when authentication fails."""
     def __init__(self, message: str = "Authentication failed"):
