@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 from typing import Optional, Union, Any
 from pydantic import BaseModel, Field, ConfigDict
-from src.staticfloww import Gateway, StaticPayload, Section
+from src.staticfloww import Gateway, StaticPayload, Section, APIKeyHandler
 
 # 1. Define our custom sections
 class UserDetails(Section):
@@ -59,10 +59,11 @@ async def main():
     )
 
     app.add_route(
-        type="GET_SYSTEM_STATUS",
-        path="/api/status",
+        type="GET_SECURE_DATA",
+        path="/api/secure",
         method="GET",
-        mock_data={"status": "Operational", "uptime": "99.99%", "version": "1.0.4"}
+        auth=APIKeyHandler(key="secret_token_123"),
+        mock_data={"data": "This is protected info"}
     )
 
     # 4. Simulate the incoming God Schema Payload
@@ -82,14 +83,14 @@ async def main():
 
     payload = LapfundPayload(**raw_payload)
 
-    print("\n📜 Generating TypeScript Types for LapfundPayload...")
+    print("\n Generating TypeScript Types for LapfundPayload...")
     from src.staticfloww import generate_typescript
     ts_code = generate_typescript(LapfundPayload)
     print("--- Generated TypeScript ---")
     print(ts_code)
     print("----------------------------")
 
-    print("\n🚀 Processing request through StaticFlow Gateway...")
+    print("\n Processing request through StaticFlow Gateway...")
     
     # Since we don't have a real server, let's mock the proxy response for this demo
     # In a real scenario, Gateway would actually hit the URL.
@@ -108,11 +109,11 @@ async def main():
         print("\nFinal Response to Frontend:")
         print(result.model_dump_json(indent=2))
 
-        # --- Test Mock Mode ---
-        print("\n🧪 Testing Mock Mode (GET_SYSTEM_STATUS)...")
-        mock_payload = LapfundPayload(details={"type": "GET_SYSTEM_STATUS"})
-        mock_result = await app.route_request(mock_payload)
-        print("Mock Response:", mock_result)
+        # --- Test Auth/Mock Mode ---
+        print("\n🧪 Testing Auth Mode (GET_SECURE_DATA)...")
+        secure_payload = LapfundPayload(details={"type": "GET_SECURE_DATA"})
+        secure_result = await app.route_request(secure_payload)
+        print("Secure Response:", secure_result)
 
     except Exception as e:
         print(f"\nError: {e}")

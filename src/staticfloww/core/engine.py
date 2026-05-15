@@ -14,7 +14,12 @@ class FlowEngine:
     def __init__(self, proxy: ProxyHandler):
         self.proxy = proxy
 
-    async def process(self, payload: StaticPayload, route: RouteDefinition) -> Any:
+    async def process(
+        self, 
+        payload: StaticPayload, 
+        route: RouteDefinition, 
+        incoming_headers: Optional[Dict[str, str]] = None
+    ) -> Any:
         # 1. Extraction (Plucking)
         data = payload
         if route.extract:
@@ -38,6 +43,12 @@ class FlowEngine:
 
         # Prepare request data
         request_json = data.model_dump() if hasattr(data, "model_dump") else data
+        
+        # Prepare headers
+        upstream_headers = {}
+        if route.auth:
+            auth_headers = await route.auth.get_headers(incoming_headers or {})
+            upstream_headers.update(auth_headers)
 
         # 4. Proxy Call (or Mock)
         if route.mock_data is not None:
@@ -47,7 +58,8 @@ class FlowEngine:
             response = await self.proxy.request(
                 method=route.method,
                 path=route.path,
-                json_data=request_json
+                json_data=request_json,
+                headers=upstream_headers
             )
             
             # Check for HTTP errors
