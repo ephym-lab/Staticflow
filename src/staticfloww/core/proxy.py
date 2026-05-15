@@ -22,17 +22,28 @@ class ProxyHandler:
         path: str,
         json_data: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, Any]] = None
+        params: Optional[Dict[str, Any]] = None,
+        request_format: str = "json"
     ) -> httpx.Response:
         try:
-            # Only send JSON if there's actual data and it's not a GET request
-            # (or if specifically required)
-            send_json = json_data if method.upper() != "GET" else None
+            # Prepare the body based on explicit request_format
+            json_body = None
+            form_data = None
+            
+            if method.upper() != "GET" and json_data:
+                if request_format == "form":
+                    form_data = json_data
+                    # Automatically ensure Content-Type is set if using form
+                    if headers is None: headers = {}
+                    headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
+                else:
+                    json_body = json_data
             
             response = await self._client.request(
                 method=method,
                 url=path,
-                json=send_json,
+                json=json_body,
+                data=form_data,
                 headers=headers,
                 params=params
             )

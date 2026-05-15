@@ -15,6 +15,7 @@ class RouteDefinition:
     auth: Optional[Any] = None
     mock_data: Optional[Any] = None
     resilience: Optional[Any] = None
+    request_format: str = "json"
 
 @dataclass
 class FanOutRouteDefinition:

@@ -4,6 +4,7 @@ from .proxy import ProxyHandler
 from .engine import FlowEngine
 from ..schemas.base import StaticPayload
 from ..exceptions import StaticflowwError, RouteNotFoundError
+from .auth import APIKeyHandler, PassthroughHandler, OAuth2Handler
 
 class Gateway:
     """
@@ -11,11 +12,28 @@ class Gateway:
     Supports action-based routing and unified transaction auditing.
     """
     def __init__(self, base_url: str, auditor: Optional[Any] = None):
+        self.base_url = base_url.rstrip("/")
         self.router = Router()
-        self.proxy = ProxyHandler(base_url=base_url)
+        self.proxy = ProxyHandler(base_url=self.base_url)
         self.engine = FlowEngine(proxy=self.proxy)
         self.auditor = auditor
-        print(f"📡 [StaticFlow] Gateway Active -> {base_url}")
+        print(f"📡 [StaticFlow] Gateway Active -> {self.base_url}")
+
+    def api_key_auth(self, **kwargs) -> APIKeyHandler:
+        """Factory for APIKeyHandler"""
+        return APIKeyHandler(**kwargs)
+
+    def passthrough_auth(self, **kwargs) -> PassthroughHandler:
+        """Factory for PassthroughHandler"""
+        return PassthroughHandler(**kwargs)
+
+    def oauth2_auth(self, token_path: str, **kwargs) -> OAuth2Handler:
+        """
+        Factory for OAuth2Handler that automatically prepends the gateway's base_url
+        to the token_path.
+        """
+        full_url = f"{self.base_url}/{token_path.lstrip('/')}"
+        return OAuth2Handler(token_url=full_url, **kwargs)
 
     def add_route(self, **kwargs):
         """
