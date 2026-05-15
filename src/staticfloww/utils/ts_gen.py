@@ -25,9 +25,11 @@ class TSGenerator:
         lines = [f"export interface {name} {{"]
         
         for field_name, field in model.model_fields.items():
+            # Use the alias (e.g., 'type') if available, otherwise use the field name
+            ts_field_name = field.alias if field.alias else field_name
             ts_type = self._get_ts_type(field.annotation)
             optional = not field.is_required()
-            lines.append(f"  {field_name}{'?' if optional else ''}: {ts_type};")
+            lines.append(f"  {ts_field_name}{'?' if optional else ''}: {ts_type};")
         
         lines.append("}")
         self.output.append("\n".join(lines))

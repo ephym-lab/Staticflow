@@ -21,13 +21,12 @@ In modern microservice or multi-API environments, frontend applications suffer f
 ## 🛠 Key Features
 
 -   **🎯 The "God Schema" Engine**: Maintain one single Pydantic-based schema that never changes shape.
--   **🧬 Smart Extraction**: Automatically extract and validate data segments (e.g., `MemberDetails`) based on the request `type`.
--   **⚡ High-Performance Proxy**: Built-in connection pooling using `httpx` with optimized timeouts and retries.
--   **🛡 Strict Bi-directional Validation**: Validate and transform data **before** it hits the upstream and **before** it returns to the frontend using Pydantic models.
--   **🔒 Unified Auth**: Seamlessly handle system-to-system auth (Client Credentials) or user-token passthrough.
+-   **🧬 Smart Extraction**: Automatically extract and validate data segments based on the request `type`.
+-   **⚡ High-Performance Proxy**: Built-in connection pooling using `httpx`.
+-   **🛡 Strict Bi-directional Validation**: Validate and transform data **before** it hits the upstream and **before** it returns to the frontend.
+-   **🔒 Flexible Auth**: Handle API Keys (Header/Body/Param), OAuth2 Client Credentials, or Passthrough with Bearer normalization.
 -   **🔌 Pluggable Auditing**: Choose your audit strategy: **MongoDB**, **In-Memory**, or **Disable** entirely.
--   **📝 Async Logging**: Built-in middleware for tracking latency and status code normalization without blocking the request.
--   **🛡 Resilience**: Built-in circuit breaking and error normalization (e.g., turning 10 different error formats into one standard).
+-   **🛡 Resilience**: Built-in **Exponential Backoff Retries** and **Circuit Breaking** to prevent cascading failures.
 -   **📜 Contract Generation**: Automatically export your Python schema to **TypeScript types** for your frontend team.
 -   **🧪 Mocking Mode**: Return mock data for specific routes to unblock frontend development.
 
@@ -37,111 +36,78 @@ In modern microservice or multi-API environments, frontend applications suffer f
 
 ```mermaid
 graph TD
-    A[Frontend App] -- "1. Single POST (Static God Schema)" --> B[StaticFlow Gateway]
+    A["Frontend App"] -- "1. Single POST (Static God Schema)" --> B["StaticFlow Gateway"]
     B -- "2. Extract & Validate" --> C{Routing Engine}
-    C -- "Internal Action" --> D[Internal Handler (Auth/Logs/DB)]
-    C -- "Proxy Action" --> E[Upstream Service A]
-    C -- "Proxy Action" --> F[Upstream Service B]
+    C -- "Internal Action" --> D["Internal Handler (Auth/Logs/DB)"]
+    C -- "Proxy Action" --> E["Upstream Service A"]
+    C -- "Proxy Action" --> F["Upstream Service B"]
     B -- "3. Standardized Response" --> A
-    B -. "4. Async Log" .-> G[(Audit Database)]
+    B -. "4. Async Log" .-> G[("(Audit Database)")]
 ```
 
 ---
 
-## 🚀 Quick Start (Concept)
+## 🚀 Quick Start
 
-### 1. Define your Static Schema
+### 1. Install
+```bash
+pip install staticfloww
+```
+
+### 2. Define your Static Schema
 ```python
-from staticflow import StaticPayload, Section
+from staticfloww import StaticPayload, Section
 from typing import Optional
 
+class UserDetails(Section):
+    first_name: str
+    last_name: str
+
 class MyGodSchema(StaticPayload):
-    # Meta fields for all requests
-    SessionID: str
-    IMEI: Optional[str] = ""
-    
     # Data Sections for specific requests
-    UserDetails: Optional[Section] = None
+    UserDetails: Optional[UserDetails] = None
     PaymentDetails: Optional[Section] = None
 ```
 
-### 2. Configure the Gateway
+### 3. Configure the Gateway
 ```python
-from staticflow import Gateway
+from staticfloww import Gateway, APIKeyHandler, ResilienceStrategy
 
 app = Gateway(base_url="https://api.your-backend.com")
 
 app.add_route(
     type="CREATE_MEMBER",
     path="/api/members/register",
-    method="POST",
     extract="UserDetails",
-    before_request=enrich_user_data,  # Custom Business Logic
-    after_response=format_response,   # Custom Response Formatting
-    request_model=UpstreamCreateUser, # Validates before sending
-    response_model=FrontendUserRes     # Cleans up before returning
+    auth=APIKeyHandler(key="your-secret-key", location="header"),
+    resilience=ResilienceStrategy(max_retries=3),
+    request_model=UpstreamModel,
+    response_model=FrontendModel
 )
 ```
 
-### 3. Configure Auditing (Optional)
+### 4. Generate Frontend Types
 ```python
-from staticflow import Gateway, MongoAudit, MemoryAudit
-
-# Option A: Production MongoDB Auditing
-app = Gateway(base_url="...", auditor=MongoAudit(uri="mongodb://localhost:27017"))
-
-# Option B: Lightweight In-Memory Auditing (for small apps/tests)
-app = Gateway(base_url="...", auditor=MemoryAudit())
-
-# Option C: Disable Auditing completely
-app = Gateway(base_url="...", auditor=None)
-```
-
-### 4. Handle the Flow
-```python
-@app.post("/gateway/process")
-async def process(payload: MyGodSchema):
-    # StaticFlow extracts, routes, proxies, and logs automatically
-    return await app.route_request(payload)
-```
-
----
-
-## 📦 The "God Schema" Payload Pattern
-The frontend always sends the same shape. The gateway ignores empty sections and only processes what is required for the specific `type`.
-
-```json
-{
-  "FormID": "MEMBER_REG_2026",
-  "details": {
-    "type": "CREATE-MEMBER",
-    "country": "KENYA"
-  },
-  "MemberDetails": {
-    "firstName": "John",
-    "lastName": "Doe"
-  },
-  "PaymentDetails": [],
-  "Filters": {},
-  "SessionID": "token_abc_123",
-  "IMEI": "device_8877",
-  "Country": "KENYA"
-}
+from staticfloww import generate_typescript
+print(generate_typescript(MyGodSchema))
 ```
 
 ---
 
 ## 📂 Project Structure
 ```text
-staticflow/
+staticfloww/
 ├── core/
-│   ├── engine.py      # The Extraction Logic
-│   ├── proxy.py       # High-performance Httpx Wrapper
-│   └── routing.py     # Mapping & Path Resolution
+│   ├── engine.py      # Extraction, Hooks & Validation logic
+│   ├── gateway.py     # Main Entry point (Gateway class)
+│   ├── proxy.py       # Httpx communication
+│   ├── routing.py     # Route & Action mapping
+│   ├── auth.py        # APIKey, OAuth2, Passthrough
+│   └── resilience.py  # Retries & Circuit Breaker
 ├── middleware/
-│   └── auditing.py    # Async Logging Handlers
+│   └── auditing.py    # Memory & MongoDB logging
 ├── schemas/
-│   └── base.py        # Base StaticPayload models
+│   └── base.py        # StaticPayload & Section definitions
 └── utils/
     └── ts_gen.py      # TypeScript Generator
 ```
@@ -149,17 +115,17 @@ staticflow/
 ---
 
 ## 🔐 Flexible Auth Strategies
-StaticFlow can manage diverse authentication requirements for different upstream services, keeping your frontend code clean:
+StaticFlow manages diverse authentication requirements keeping your frontend code clean:
 
 ```python
-# Service A uses OAuth2 (Client Credentials)
-app.add_route(type="GET-MEMBER", auth=OAuth2Handler(settings.oauth_config))
+# Passthrough with Bearer normalization
+app.add_route(..., auth=PassthroughHandler(bearer_format="ensure"))
 
-# Service B uses a static API Key
-app.add_route(type="UPDATE-PROFILE", auth=APIKeyHandler(key="your_secret_key"))
+# API Key in the JSON Body
+app.add_route(..., auth=APIKeyHandler(key="abc", location="body", name="token"))
 
-# Service C uses Passthrough (forwarding the user's Bearer token)
-app.add_route(type="GET-LOGS", auth=PassthroughHandler())
+# OAuth2 Client Credentials (with auto-refresh)
+app.add_route(..., auth=OAuth2Handler(token_url="...", client_id="...", client_secret="..."))
 ```
 
 ---
@@ -168,13 +134,10 @@ app.add_route(type="GET-LOGS", auth=PassthroughHandler())
 
 -   **🔀 Parallel Fan-out**: Trigger multiple upstream requests in parallel and merge results into a single response.
 -   **⏱ Rate Limiting**: Built-in protection to prevent gateway or upstream abuse.
--   **🛡 Data Masking**: Automatically redact sensitive fields (PII) from audit logs.
 -   **📊 Health Dashboard**: Real-time status of all upstream services.
--   **🔌 Custom Interceptors**: `before_request` and `after_response` hooks for deep customization.
--   **🤖 AI Scaffolding Agent**: Provide an API doc URL and let AI automatically generate your Pydantic schemas and gateway configurations.
+-   **🤖 AI Scaffolding Agent**: Automatically generate Pydantic schemas from API docs.
 
 ---
 
 ## 📄 License
 MIT License. Created with ❤️ for clean API architectures.
-# Staticflow

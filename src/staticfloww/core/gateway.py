@@ -27,7 +27,7 @@ class Gateway:
         """
         Main entry point to process a God Schema payload.
         """
-        request_type = payload.details.type
+        request_type = payload.details.action
         route = self.router.get_route(request_type)
         
         if not route:

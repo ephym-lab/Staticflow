@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 import httpx
+import time
 from ..exceptions import AuthError
 
 class AuthHandler(ABC):
@@ -11,9 +12,11 @@ class AuthHandler(ABC):
     @abstractmethod
     async def apply(
         self, 
-        headers: Dict[str, str], 
-        params: Dict[str, Any], 
-        json_data: Dict[str, Any]
+        incoming_headers: Dict[str, str],
+        upstream_headers: Dict[str, str], 
+        upstream_params: Dict[str, Any], 
+        upstream_json: Dict[str, Any],
+        **kwargs
     ) -> Tuple[Dict[str, str], Dict[str, Any], Dict[str, Any]]:
         """
         Returns the modified (headers, params, json_data).
@@ -35,53 +38,6 @@ class APIKeyHandler(AuthHandler):
         self.name = name
         self.location = location
 
-    async def apply(self, headers, params, json_data):
-        if self.location == "header":
-            headers[self.name] = self.key
-        elif self.location == "param":
-            params[self.name] = self.key
-        elif self.location == "body":
-            json_data[self.name] = self.key
-        return headers, params, json_data
-
-class PassthroughHandler(AuthHandler):
-    """
-    Forwards an auth-related header from the incoming request.
-    """
-    def __init__(self, header_name: str = "Authorization"):
-        self.header_name = header_name
-
-    async def apply(self, headers, params, json_data):
-        # We assume the incoming headers are already passed or available
-        # This one is tricky as it needs access to the 'context' of the incoming request.
-        # We'll rely on the engine passing the incoming_headers.
-        return headers, params, json_data
-
-    async def apply_with_context(self, incoming_headers, headers, params, json_data):
-        auth_header = incoming_headers.get(self.header_name) or incoming_headers.get(self.header_name.lower())
-        if auth_header:
-            headers[self.name] = auth_header # Wait, name? I should use self.header_name
-        return headers, params, json_data
-
-# Refined AuthHandler to simplify context passing
-class AuthHandler(ABC):
-    @abstractmethod
-    async def apply(
-        self, 
-        incoming_headers: Dict[str, str],
-        upstream_headers: Dict[str, str], 
-        upstream_params: Dict[str, Any], 
-        upstream_json: Dict[str, Any],
-        **kwargs
-    ) -> Tuple[Dict[str, str], Dict[str, Any], Dict[str, Any]]:
-        pass
-
-class APIKeyHandler(AuthHandler):
-    def __init__(self, key: str, name: str = "X-API-Key", location: str = "header"):
-        self.key = key
-        self.name = name
-        self.location = location
-
     async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json, **kwargs):
         if self.location == "header":
             upstream_headers[self.name] = self.key
@@ -92,6 +48,10 @@ class APIKeyHandler(AuthHandler):
         return upstream_headers, upstream_params, upstream_json
 
 class PassthroughHandler(AuthHandler):
+    """
+    Forwards an auth-related header from the incoming request to the upstream.
+    Supports Bearer token normalization.
+    """
     def __init__(
         self, 
         header_name: str = "Authorization", 
@@ -119,11 +79,23 @@ class PassthroughHandler(AuthHandler):
         return upstream_headers, upstream_params, upstream_json
 
 class OAuth2Handler(AuthHandler):
-    def __init__(self, token_url: str, client_id: str, client_secret: str, scope: Optional[str] = None):
+    """
+    Implements OAuth2 Client Credentials flow with automatic token caching and refresh.
+    Allows for a custom token_extractor to handle diverse response formats.
+    """
+    def __init__(
+        self, 
+        token_url: str, 
+        client_id: str, 
+        client_secret: str, 
+        scope: Optional[str] = None,
+        token_extractor: Optional[Callable[[Dict[str, Any]], Tuple[str, int]]] = None
+    ):
         self.token_url = token_url
         self.client_id = client_id
         self.client_secret = client_secret
         self.scope = scope
+        self.token_extractor = token_extractor
         self._token: Optional[str] = None
         self._expires_at: float = 0
 
@@ -133,7 +105,6 @@ class OAuth2Handler(AuthHandler):
         return upstream_headers, upstream_params, upstream_json
 
     async def _get_valid_token(self) -> str:
-        import time
         if self._token and time.time() < self._expires_at - 60:
             return self._token
         
@@ -151,6 +122,20 @@ class OAuth2Handler(AuthHandler):
                 raise AuthError(f"Failed to fetch OAuth2 token: {response.text}")
             
             res_json = response.json()
-            self._token = res_json["access_token"]
-            self._expires_at = time.time() + res_json.get("expires_in", 3600)
+            
+            # Use custom extractor if provided, otherwise fallback to standard keys
+            if self.token_extractor:
+                try:
+                    self._token, expires_in = self.token_extractor(res_json)
+                    self._expires_at = time.time() + expires_in
+                except Exception as e:
+                    raise AuthError(f"Token extraction failed: {str(e)}")
+            else:
+                self._token = res_json.get("access_token")
+                expires_in = res_json.get("expires_in", 3600)
+                self._expires_at = time.time() + expires_in
+
+            if not self._token:
+                raise AuthError("No access_token found in response")
+                
             return self._token

@@ -12,9 +12,11 @@ class RequestDetails(BaseModel):
     """
     Meta details about the specific request action.
     """
-    type: str
+    action: str = Field(alias="type")
     country: Optional[str] = None
     version: Optional[str] = "v1"
+
+    model_config = ConfigDict(populate_by_name=True)
 
 class StaticPayload(BaseModel):
     """
