@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "staticfloww"
 version = "0.1.0"
 authors = [
-  { name="Ephym Lab", email="ephym@example.com" },
+  { name="Ephym Lab", email="ephymmucira@gmail.com" },
 ]
 description = "Universal Gateway Framework for God Schema Architectures"
 readme = "README.md"
