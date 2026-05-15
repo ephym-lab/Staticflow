@@ -4,6 +4,9 @@
 
 `StaticFlow` is a lightweight, high-performance Python framework designed to simplify Backend-for-Frontend (BFF) development. It enables a **"Universal Gateway"** pattern where the frontend communicates via a single, static JSON contract (the "God Schema"), while the gateway handles routing, data extraction, and upstream proxying.
 
+[![PyPI version](https://badge.fury.io/py/staticfloww.svg)](https://badge.fury.io/py/staticfloww)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ---
 
 ## 🌟 The Problem
@@ -14,19 +17,18 @@ In modern microservice or multi-API environments, frontend applications suffer f
 -   **Observability Gaps**: Difficulty tracking a single user action across multiple downstream calls.
 
 ## ✨ The Solution: StaticFlow
-`StaticFlow` provides a unified proxy layer that "plucks" exactly what it needs from a static, massive payload (the God Schema) and forwards it to the correct upstream service.
+`StaticFlow` provides a unified proxy layer that "plucks" exactly what it needs from a static, massive payload (the God Schema) and forwards it to the correct upstream service. It turns your backend into a clean, predictable API for your frontend team.
 
 ---
 
 ## 🛠 Key Features
 
 -   **🎯 The "God Schema" Engine**: Maintain one single Pydantic-based schema that never changes shape.
--   **🧬 Smart Extraction**: Automatically extract and validate data segments based on the request `type`.
--   **⚡ High-Performance Proxy**: Built-in connection pooling using `httpx`.
--   **🛡 Strict Bi-directional Validation**: Validate and transform data **before** it hits the upstream and **before** it returns to the frontend.
--   **🔒 Flexible Auth**: Handle API Keys (Header/Body/Param), OAuth2 Client Credentials, or Passthrough with Bearer normalization.
--   **🔌 Pluggable Auditing**: Choose your audit strategy: **MongoDB**, **In-Memory**, or **Disable** entirely.
+-   **🧬 Smart Extraction**: Automatically extract and validate data segments based on the request `action`.
+-   **🔀 Parallel Fan-out**: Trigger multiple upstream requests in parallel (using `asyncio.TaskGroup`) and merge results into a single response.
 -   **🛡 Resilience**: Built-in **Exponential Backoff Retries** and **Circuit Breaking** to prevent cascading failures.
+-   **🔒 Flexible Auth**: Handle API Keys (Header/Body/Param), OAuth2 Client Credentials, or Passthrough with Bearer normalization.
+-   **🔌 Unified Auditing**: Log entire request/response/error cycles as single atomic transactions to **MongoDB** or **In-Memory**.
 -   **📜 Contract Generation**: Automatically export your Python schema to **TypeScript types** for your frontend team.
 -   **🧪 Mocking Mode**: Return mock data for specific routes to unblock frontend development.
 
@@ -42,7 +44,7 @@ graph TD
     C -- "Proxy Action" --> E["Upstream Service A"]
     C -- "Proxy Action" --> F["Upstream Service B"]
     B -- "3. Standardized Response" --> A
-    B -. "4. Async Log" .-> G[("(Audit Database)")]
+    B -. "4. Unified Audit Log" .-> G[("(Audit Database)")]
 ```
 
 ---
@@ -66,30 +68,35 @@ class UserDetails(Section):
 class MyGodSchema(StaticPayload):
     # Data Sections for specific requests
     UserDetails: Optional[UserDetails] = None
-    PaymentDetails: Optional[Section] = None
 ```
 
 ### 3. Configure the Gateway
 ```python
-from staticfloww import Gateway, APIKeyHandler, ResilienceStrategy
+from staticfloww import Gateway, APIKeyHandler, MemoryAuditor
 
-app = Gateway(base_url="https://api.your-backend.com")
+# Initialize with In-Memory Auditing
+auditor = MemoryAuditor()
+app = Gateway(base_url="https://api.your-backend.com", auditor=auditor)
 
 app.add_route(
-    type="CREATE_MEMBER",
+    action="CREATE_MEMBER",
     path="/api/members/register",
+    method="POST",
     extract="UserDetails",
-    auth=APIKeyHandler(key="your-secret-key", location="header"),
-    resilience=ResilienceStrategy(max_retries=3),
-    request_model=UpstreamModel,
-    response_model=FrontendModel
+    auth=APIKeyHandler(key="your-secret-key", location="header")
 )
 ```
 
-### 4. Generate Frontend Types
+### 4. Use in FastAPI
 ```python
-from staticfloww import generate_typescript
-print(generate_typescript(MyGodSchema))
+from fastapi import FastAPI
+from my_schema import MyGodSchema
+
+web_app = FastAPI()
+
+@web_app.post("/gateway")
+async def handle_request(payload: MyGodSchema):
+    return await app.route_request(payload)
 ```
 
 ---
@@ -98,8 +105,8 @@ print(generate_typescript(MyGodSchema))
 ```text
 staticfloww/
 ├── core/
-│   ├── engine.py      # Extraction, Hooks & Validation logic
-│   ├── gateway.py     # Main Entry point (Gateway class)
+│   ├── engine.py      # Orchestrator (TaskGroups & Semaphores)
+│   ├── gateway.py     # Main Entry point
 │   ├── proxy.py       # Httpx communication
 │   ├── routing.py     # Route & Action mapping
 │   ├── auth.py        # APIKey, OAuth2, Passthrough
@@ -114,28 +121,11 @@ staticfloww/
 
 ---
 
-## 🔐 Flexible Auth Strategies
-StaticFlow manages diverse authentication requirements keeping your frontend code clean:
-
-```python
-# Passthrough with Bearer normalization
-app.add_route(..., auth=PassthroughHandler(bearer_format="ensure"))
-
-# API Key in the JSON Body
-app.add_route(..., auth=APIKeyHandler(key="abc", location="body", name="token"))
-
-# OAuth2 Client Credentials (with auto-refresh)
-app.add_route(..., auth=OAuth2Handler(token_url="...", client_id="...", client_secret="..."))
-```
-
----
-
 ## 🛣 Future Roadmap
 
--   **🔀 Parallel Fan-out**: Trigger multiple upstream requests in parallel and merge results into a single response.
 -   **⏱ Rate Limiting**: Built-in protection to prevent gateway or upstream abuse.
--   **📊 Health Dashboard**: Real-time status of all upstream services.
--   **🤖 AI Scaffolding Agent**: Automatically generate Pydantic schemas from API docs.
+-   **📊 Health Dashboard**: Real-time status of all upstream services and circuit states.
+-   **🤖 AI Scaffolding Agent**: Automatically generate Pydantic schemas from Swagger/OpenAPI docs.
 
 ---
 

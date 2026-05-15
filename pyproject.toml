@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "staticfloww"
 version = "0.1.0"
 authors = [
-  { name="Ephym Lab", email="ephymmucira@gmail.com" },
+  { name="Ephy Mucira", email="ephymmucira@gmail.com" },
 ]
 description = "Universal Gateway Framework for God Schema Architectures"
 readme = "README.md"
@@ -14,9 +14,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0.0",
     "httpx>=0.24.0",
-    "motor>=3.1.0",
-    "fastapi>=0.100.0",
-    "uvicorn>=0.22.0"
+    "motor>=3.1.0"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -28,6 +26,11 @@ classifiers = [
 test = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0"
+]
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "flask>=3.0.0"
 ]
 
 [tool.setuptools.packages.find]
