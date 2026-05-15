@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 from .routing import Router, RouteDefinition
 from .proxy import ProxyHandler
 from .engine import FlowEngine
@@ -6,11 +6,16 @@ from ..schemas.base import StaticPayload
 from ..exceptions import StaticflowwError, RouteNotFoundError
 
 class Gateway:
+    """
+    Main Gateway class that coordinates the entire request lifecycle.
+    Supports action-based routing and unified transaction auditing.
+    """
     def __init__(self, base_url: str, auditor: Optional[Any] = None):
         self.router = Router()
         self.proxy = ProxyHandler(base_url=base_url)
         self.engine = FlowEngine(proxy=self.proxy)
         self.auditor = auditor
+        print(f"📡 [StaticFlow] Gateway Active -> {base_url}")
 
     def add_route(self, **kwargs):
         """
@@ -26,6 +31,7 @@ class Gateway:
     ) -> Any:
         """
         Main entry point to process a God Schema payload.
+        Orchestrates the flow and logs the entire transaction at the end.
         """
         request_type = payload.details.action
         route = self.router.get_route(request_type)
@@ -36,27 +42,39 @@ class Gateway:
         context = {
             "request_type": request_type,
             "session_id": payload.SessionID,
-            "imei": payload.IMEI
+            "imei": payload.IMEI,
+            "country": payload.Country
         }
 
-        # Auditing: Log Request
-        if self.auditor:
-            await self.auditor.log_request(payload.model_dump(), context)
-        
+        request_data = payload.model_dump()
+        response_data = None
+        error_data = None
+
         try:
+            # Execute the core engine flow
             response_data = await self.engine.process(payload, route, incoming_headers=headers, **kwargs)
-            
-            # Auditing: Log Response
-            if self.auditor:
-                # We dump the data if it's a Pydantic model
-                log_data = response_data.model_dump() if hasattr(response_data, "model_dump") else response_data
-                await self.auditor.log_response(log_data, context)
-                
             return response_data
             
         except Exception as e:
-            #: Log error to auditor
+            error_data = e
             raise e
+            
+        finally:
+            # 🛡 Unified Transaction Auditing
+            # We log EVERYTHING (request, response/error, context) in a single atomic record.
+            if self.auditor:
+                # Clean up response data for logging if it's a Pydantic model
+                clean_res = response_data.model_dump() if hasattr(response_data, "model_dump") else response_data
+                
+                await self.auditor.log_transaction(
+                    request=request_data,
+                    response=clean_res,
+                    error=error_data,
+                    context=context
+                )
 
     async def shutdown(self):
+        """
+        Closes the underlying HTTP client.
+        """
         await self.proxy.close()

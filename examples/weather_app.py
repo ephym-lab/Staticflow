@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI, Request, Response
 from typing import Optional, Any
 from pydantic import BaseModel
-from staticfloww import Gateway, StaticPayload, Section
+from staticfloww import Gateway, StaticPayload, Section,MemoryAuditor
 
 # 1. Define our specific God Schema Sections
 class LocationSection(Section):
@@ -46,8 +46,9 @@ async def format_weather(raw: dict, **kwargs) -> dict:
     }
 
 # --- Gateway Setup ---
+auditor = MemoryAuditor()
 app = FastAPI(title="StaticFlow Weather Gateway")
-gateway = Gateway(base_url="https://api.open-meteo.com")
+gateway = Gateway(base_url="https://api.open-meteo.com",auditor=auditor)
 
 gateway.add_route(
     action="GET_WEATHER",
@@ -58,6 +59,7 @@ gateway.add_route(
     after_response=format_weather,
     response_model=CleanWeatherRes
 )
+
 
 @app.post("/gateway")
 async def handle_gateway(payload: WeatherPayload, response: Response):
@@ -77,6 +79,13 @@ async def handle_gateway(payload: WeatherPayload, response: Response):
         status_code = getattr(e, "status_code", 500)
         response.status_code = status_code
         return {"error": str(e), "status": "failed"}
+
+@app.get("/logs")
+async def view_logs():
+    """
+    View the latest audit logs.
+    """
+    return await auditor.get_logs()
 
 if __name__ == "__main__":
     print("🚀 StaticFlow Weather Gateway starting on http://localhost:8000")

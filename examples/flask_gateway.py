@@ -1,13 +1,18 @@
 import asyncio
 from flask import Flask, request, jsonify
-from staticfloww import Gateway, StaticPayload
+from staticfloww import Gateway, StaticPayload, MemoryAuditor
 
 # --- StaticFlow with Flask ---
-# This shows that StaticFlow is framework-agnostic and 
-# can be used even in synchronous environments like Flask.
-
 app = Flask(__name__)
-gateway = Gateway(base_url="https://api.open-meteo.com")
+
+# Initialize an Auditor
+auditor = MemoryAuditor()
+
+# Pass the auditor here -> it will handle all logging automatically
+gateway = Gateway(
+    base_url="https://api.open-meteo.com",
+    auditor=auditor
+)
 
 # Register a route (standard StaticFlow logic)
 gateway.add_route(
@@ -16,31 +21,33 @@ gateway.add_route(
     method="GET"
 )
 
-@app.route('/gateway', methods=['POST'])
+@app.post("/gateway")
 def handle_gateway():
     """
-    Standard Flask POST endpoint.
+    Standard Flask POST endpoint for the God Schema.
     """
-    # 1. Get raw dictionary from Flask request
     raw_data = request.get_json()
-    
-    # 2. Wrap it in the God Schema payload
     payload = StaticPayload(**raw_data)
     
-    # 3. Execute the async gateway logic using asyncio.run
     try:
-        # Note: In a production Flask app (like with Gunicorn), 
-        # using asyncio.run is fine for individual I/O bound calls.
         result = asyncio.run(gateway.route_request(payload))
         return jsonify(result)
     
     except Exception as e:
-        # Propagate the correct status code (e.g., 400, 404, 502)
         status_code = getattr(e, "status_code", 500)
         return jsonify({
             "error": str(e),
             "status": "failed"
         }), status_code
+
+@app.get("/logs")
+def view_logs():
+    """
+    Local endpoint to view the audit history.
+    """
+    limit = request.args.get('limit', 10, type=int)
+    logs = asyncio.run(auditor.get_logs(limit=limit))
+    return jsonify(logs)
 
 if __name__ == "__main__":
     print("🚀 Flask Gateway starting on http://localhost:5000")

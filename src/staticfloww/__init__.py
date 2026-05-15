@@ -4,6 +4,7 @@ from .exceptions import *
 from .utils.ts_gen import generate_typescript
 from .core.auth import APIKeyHandler, PassthroughHandler, OAuth2Handler
 from .core.resilience import ResilienceStrategy, CircuitBreaker
+from .middleware.auditing import MemoryAuditor,MongoAuditor,BaseAuditor
 
 __version__ = "0.1.0"
 __all__ = [
@@ -15,5 +16,8 @@ __all__ = [
     "PassthroughHandler",
     "OAuth2Handler",
     "ResilienceStrategy",
-    "CircuitBreaker"
+    "CircuitBreaker",
+    "MemoryAuditor",
+    "MongoAuditor",
+    "BaseAuditor"
 ]
