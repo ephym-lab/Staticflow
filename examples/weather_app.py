@@ -4,21 +4,21 @@ from typing import Optional, Any
 from pydantic import BaseModel
 from staticfloww import Gateway, StaticPayload, Section,MemoryAuditor
 
-# 1. Define our specific God Schema Sections
+# Define your God Schema Sections
 class LocationSection(Section):
     city: str
 
 class WeatherPayload(StaticPayload):
     Location: Optional[LocationSection] = None
 
-# 2. Define how our frontend wants the data (Validation Model)
+# Define how our frontend wants the data (Validation Model)
 class CleanWeatherRes(BaseModel):
     city: str
     temperature: float
     windspeed: float
     condition_code: int
 
-# 3. Business Logic Hook: Translate City -> Coordinates
+# Business Logic Hook: Translate City -> Coordinates
 async def geocode_city(data: LocationSection, **kwargs):
     print(f"--- [Hook] Geocoding city: {data.city} ---")
     city_map = {
@@ -34,7 +34,7 @@ async def geocode_city(data: LocationSection, **kwargs):
         "current_weather": "true"
     }
 
-# 4. Response Hook: Clean up Open-Meteo's nested JSON
+# Response Hook: Clean up Open-Meteo's nested JSON
 async def format_weather(raw: dict, **kwargs) -> dict:
     print(f"--- [Hook] Formatting response for {kwargs.get('city_name')} ---")
     current = raw["current_weather"]
