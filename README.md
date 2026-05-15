@@ -1,55 +1,52 @@
-# StaticFlow 🚀
+# StaticFlow
 
 **The Unified API Gateway Framework for "God Schema" Architectures.**
 
-`StaticFlow` is a lightweight, high-performance Python framework designed to simplify Backend-for-Frontend (BFF) development. It enables a **"Universal Gateway"** pattern where the frontend communicates via a single, static JSON contract (the "God Schema"), while the gateway handles routing, data extraction, and upstream proxying.
-
-[![PyPI version](https://badge.fury.io/py/staticfloww.svg)](https://badge.fury.io/py/staticfloww)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+StaticFlow is a lightweight, high-performance Python framework designed to simplify Backend-for-Frontend (BFF) development. It enables a "Universal Gateway" pattern where the frontend communicates via a single, static JSON contract (the "God Schema"), while the gateway handles routing, data extraction, and upstream proxying.
 
 ---
 
-## 🌟 The Problem
+## The Problem
 In modern microservice or multi-API environments, frontend applications suffer from:
 -   **Fragmented Requests**: Needing to hit multiple diverse endpoints for a single view.
 -   **Breaking Contracts**: Any change in an upstream API requires a frontend update.
 -   **Auth Complexity**: Managing different authentication flows for different services.
 -   **Observability Gaps**: Difficulty tracking a single user action across multiple downstream calls.
 
-## ✨ The Solution: StaticFlow
-`StaticFlow` provides a unified proxy layer that "plucks" exactly what it needs from a static, massive payload (the God Schema) and forwards it to the correct upstream service. It turns your backend into a clean, predictable API for your frontend team.
+## The Solution: StaticFlow
+StaticFlow provides a unified proxy layer that "plucks" exactly what it needs from a static, massive payload (the God Schema) and forwards it to the correct upstream service. It turns your backend into a clean, predictable API for your frontend team.
 
 ---
 
-## 🛠 Key Features
+## Key Features
 
--   **🎯 The "God Schema" Engine**: Maintain one single Pydantic-based schema that never changes shape.
--   **🧬 Smart Extraction**: Automatically extract and validate data segments based on the request `action`.
--   **🔀 Parallel Fan-out**: Trigger multiple upstream requests in parallel (using `asyncio.TaskGroup`) and merge results into a single response.
--   **🛡 Resilience**: Built-in **Exponential Backoff Retries** and **Circuit Breaking** to prevent cascading failures.
--   **🔒 Flexible Auth**: Handle API Keys (Header/Body/Param), OAuth2 Client Credentials, or Passthrough with Bearer normalization.
--   **🔌 Unified Auditing**: Log entire request/response/error cycles as single atomic transactions to **MongoDB** or **In-Memory**.
--   **📜 Contract Generation**: Automatically export your Python schema to **TypeScript types** for your frontend team.
--   **🧪 Mocking Mode**: Return mock data for specific routes to unblock frontend development.
+-   **The God Schema Engine**: Maintain one single Pydantic-based schema that never changes shape.
+-   **Smart Extraction**: Automatically extract and validate data segments based on the request action.
+-   **Parallel Fan-out**: Trigger multiple upstream requests in parallel (using asyncio.TaskGroup) and merge results into a single response.
+-   **Resilience**: Built-in Exponential Backoff Retries and Circuit Breaking to prevent cascading failures.
+-   **Flexible Auth**: Handle API Keys (Header/Body/Param), OAuth2 Client Credentials, or Passthrough with Bearer normalization.
+-   **Unified Auditing**: Log entire request/response/error cycles as single atomic transactions to MongoDB or In-Memory.
+-   **Contract Generation**: Automatically export your Python schema to TypeScript types for your frontend team.
+-   **Mocking Mode**: Return mock data for specific routes to unblock frontend development.
 
 ---
 
-## 📐 Architecture
+## Architecture
 
 ```mermaid
 graph TD
-    A["Frontend App"] -- "1. Single POST (Static God Schema)" --> B["StaticFlow Gateway"]
+    A[Frontend App] -- "1. Single POST (Static God Schema)" --> B[StaticFlow Gateway]
     B -- "2. Extract & Validate" --> C{Routing Engine}
-    C -- "Internal Action" --> D["Internal Handler (Auth/Logs/DB)"]
-    C -- "Proxy Action" --> E["Upstream Service A"]
-    C -- "Proxy Action" --> F["Upstream Service B"]
+    C -- "Internal Action" --> D[Internal Handler (Auth/Logs/DB)]
+    C -- "Proxy Action" --> E[Upstream Service A]
+    C -- "Proxy Action" --> F[Upstream Service B]
     B -- "3. Standardized Response" --> A
-    B -. "4. Unified Audit Log" .-> G[("(Audit Database)")]
+    B -. "4. Unified Audit Log" .-> G[(Audit Database)]
 ```
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Install
 ```bash
@@ -101,7 +98,7 @@ async def handle_request(payload: MyGodSchema):
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 ```text
 staticfloww/
 ├── core/
@@ -121,13 +118,13 @@ staticfloww/
 
 ---
 
-## 🛣 Future Roadmap
+## Future Roadmap
 
--   **⏱ Rate Limiting**: Built-in protection to prevent gateway or upstream abuse.
--   **📊 Health Dashboard**: Real-time status of all upstream services and circuit states.
--   **🤖 AI Scaffolding Agent**: Automatically generate Pydantic schemas from Swagger/OpenAPI docs.
+-   **Rate Limiting**: Built-in protection to prevent gateway or upstream abuse.
+-   **Health Dashboard**: Real-time status of all upstream services and circuit states.
+-   **AI Scaffolding Agent**: Automatically generate Pydantic schemas from Swagger/OpenAPI docs.
 
 ---
 
-## 📄 License
-MIT License. Created with ❤️ for clean API architectures.
+## License
+MIT License. Created for clean API architectures.
