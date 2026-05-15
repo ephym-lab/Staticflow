@@ -14,6 +14,7 @@ class RouteDefinition:
     response_model: Optional[Type[BaseModel]] = None
     auth: Optional[Any] = None
     mock_data: Optional[Any] = None
+    resilience: Optional[Any] = None
 
 class Router:
     def __init__(self):

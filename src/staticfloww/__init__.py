@@ -3,6 +3,7 @@ from .schemas.base import StaticPayload, Section
 from .exceptions import *
 from .utils.ts_gen import generate_typescript
 from .core.auth import APIKeyHandler, PassthroughHandler, OAuth2Handler
+from .core.resilience import ResilienceStrategy, CircuitBreaker
 
 __version__ = "0.1.0"
 __all__ = [
@@ -12,5 +13,7 @@ __all__ = [
     "generate_typescript",
     "APIKeyHandler",
     "PassthroughHandler",
-    "OAuth2Handler"
+    "OAuth2Handler",
+    "ResilienceStrategy",
+    "CircuitBreaker"
 ]

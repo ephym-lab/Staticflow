@@ -66,6 +66,14 @@ async def main():
         mock_data={"data": "This is protected info"}
     )
 
+    app.add_route(
+        type="POST_SECURE_BODY",
+        path="/api/secure-body",
+        method="POST",
+        auth=APIKeyHandler(key="body_secret_456", name="api_token", location="body"),
+        mock_data={"status": "Body auth verified"}
+    )
+
     # 4. Simulate the incoming God Schema Payload
     raw_payload = {
         "details": {
@@ -113,7 +121,12 @@ async def main():
         print("\n🧪 Testing Auth Mode (GET_SECURE_DATA)...")
         secure_payload = LapfundPayload(details={"type": "GET_SECURE_DATA"})
         secure_result = await app.route_request(secure_payload)
-        print("Secure Response:", secure_result)
+        print("Secure Response (Header):", secure_result)
+
+        print("\n🧪 Testing Body Auth Mode (POST_SECURE_BODY)...")
+        body_payload = LapfundPayload(details={"type": "POST_SECURE_BODY"})
+        body_result = await app.route_request(body_payload)
+        print("Secure Response (Body):", body_result)
 
     except Exception as e:
         print(f"\nError: {e}")

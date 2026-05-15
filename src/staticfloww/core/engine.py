@@ -41,26 +41,41 @@ class FlowEngine:
             except Exception as e:
                 raise RequestValidationError(str(e)) from e
 
-        # Prepare request data
+        # Prepare request components
         request_json = data.model_dump() if hasattr(data, "model_dump") else data
-        
-        # Prepare headers
         upstream_headers = {}
+        upstream_params = {}
+        
         if route.auth:
-            auth_headers = await route.auth.get_headers(incoming_headers or {})
-            upstream_headers.update(auth_headers)
+            upstream_headers, upstream_params, request_json = await route.auth.apply(
+                incoming_headers or {},
+                upstream_headers,
+                upstream_params,
+                request_json
+            )
 
         # 4. Proxy Call (or Mock)
         if route.mock_data is not None:
             print(f"--- [Mock Mode] Returning mock data for {route.type} ---")
             response_data = route.mock_data
         else:
-            response = await self.proxy.request(
-                method=route.method,
-                path=route.path,
-                json_data=request_json,
-                headers=upstream_headers
-            )
+            if route.resilience:
+                response = await route.resilience.execute(
+                    self.proxy.request,
+                    method=route.method,
+                    path=route.path,
+                    json_data=request_json,
+                    headers=upstream_headers,
+                    params=upstream_params
+                )
+            else:
+                response = await self.proxy.request(
+                    method=route.method,
+                    path=route.path,
+                    json_data=request_json,
+                    headers=upstream_headers,
+                    params=upstream_params
+                )
             
             # Check for HTTP errors
             response.raise_for_status()
