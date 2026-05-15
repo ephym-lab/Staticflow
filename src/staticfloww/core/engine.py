@@ -36,7 +36,7 @@ class FlowEngine:
         incoming_headers: Optional[Dict[str, str]],
         **kwargs
     ) -> Any:
-        print(f"--- [Fan-out] Executing {len(fanout_route.routes)} parallel requests for {fanout_route.type} ---")
+        print(f"--- [Fan-out] Executing {len(fanout_route.routes)} parallel requests for {fanout_route.action} ---")
         
         # Execute all routes in parallel
         tasks = [
@@ -104,7 +104,7 @@ class FlowEngine:
 
         # 4. Proxy Call (or Mock)
         if route.mock_data is not None:
-            print(f"--- [Mock Mode] Returning mock data for {route.type} ---")
+            print(f"--- [Mock Mode] Returning mock data for {route.action} ---")
             response_data = route.mock_data
         else:
             if hasattr(route, "resilience") and route.resilience:

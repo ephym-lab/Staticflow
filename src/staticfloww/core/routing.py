@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 @dataclass
 class RouteDefinition:
-    type: str
+    action: str
     path: str
     method: str = "POST"
     extract: Optional[str] = None
@@ -18,7 +18,7 @@ class RouteDefinition:
 
 @dataclass
 class FanOutRouteDefinition:
-    type: str
+    action: str
     routes: List[RouteDefinition]
     merge_hook: Optional[Callable[[List[Any]], Any]] = None
 
@@ -27,16 +27,30 @@ class Router:
         self._routes: Dict[str, Union[RouteDefinition, FanOutRouteDefinition]] = {}
 
     def add_route(self, **kwargs):
+        # Support both 'type' and 'action' for registration
+        action_name = kwargs.pop("action", kwargs.pop("type", None))
+        if not action_name:
+            raise ValueError("Route must have an 'action' or 'type' defined")
+
         if "fan_out" in kwargs:
             fan_out_routes = kwargs.pop("fan_out")
+            processed_subroutes = []
+            for r in fan_out_routes:
+                if isinstance(r, dict):
+                    # Ensure sub-routes also use 'action' internally
+                    sub_action = r.pop("action", r.pop("type", None))
+                    processed_subroutes.append(RouteDefinition(action=sub_action, **r))
+                else:
+                    processed_subroutes.append(r)
+            
             route = FanOutRouteDefinition(
-                type=kwargs["type"],
-                routes=[RouteDefinition(**r) if isinstance(r, dict) else r for r in fan_out_routes],
+                action=action_name,
+                routes=processed_subroutes,
                 merge_hook=kwargs.get("merge_hook")
             )
         else:
-            route = RouteDefinition(**kwargs)
-        self._routes[route.type] = route
+            route = RouteDefinition(action=action_name, **kwargs)
+        self._routes[route.action] = route
 
-    def get_route(self, request_type: str) -> Optional[Union[RouteDefinition, FanOutRouteDefinition]]:
-        return self._routes.get(request_type)
+    def get_route(self, action_name: str) -> Optional[Union[RouteDefinition, FanOutRouteDefinition]]:
+        return self._routes.get(action_name)
