@@ -1,4 +1,5 @@
 import httpx
+import asyncio
 from typing import Any, Dict, Optional
 from ..exceptions import (
     UpstreamTimeoutError, 
@@ -15,17 +16,34 @@ class ProxyHandler:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
         self._client: Optional[httpx.AsyncClient] = None
+        self._loop_id: Optional[int] = None
 
     def _get_client(self) -> httpx.AsyncClient:
         """
-        Ensures the client is initialized and attached to the current loop.
+        Ensures the client is initialized and attached to the current active loop.
+        If the loop has changed (e.g. new Flask request), it refreshes the client.
         """
-        if self._client is None or self._client.is_closed:
+        try:
+            current_loop = asyncio.get_event_loop()
+            current_loop_id = id(current_loop)
+        except RuntimeError:
+            current_loop_id = None
+
+        # Re-initialize if:
+        # 1. No client exists
+        # 2. Client is closed
+        # 3. We are in a brand new event loop (Flask/asyncio.run case)
+        if (self._client is None or 
+            self._client.is_closed or 
+            self._loop_id != current_loop_id):
+            
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=30.0,
                 follow_redirects=True
             )
+            self._loop_id = current_loop_id
+            
         return self._client
 
     async def request(

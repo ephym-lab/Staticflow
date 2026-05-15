@@ -61,10 +61,9 @@ class MemoryAuditor(BaseAuditor):
     async def log_transaction(self, request: Any, response: Any = None, error: Any = None, context: Dict[str, Any] = None):
         self.logs.append({
             "timestamp": time.time(),
-            "type": "transaction",
             "request": request,
             "response": response,
-            "error": str(error) if error else None,
+            "error": error, # Keep the dict/summary if present
             "context": context
         })
 
@@ -109,7 +108,7 @@ class MongoAuditor(BaseAuditor):
             "type": "transaction",
             "request": request,
             "response": response,
-            "error": str(error) if error else None,
+            "error": error, # Preserves structured summary/traceback
             "context": context
         })
 

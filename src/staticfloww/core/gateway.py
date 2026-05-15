@@ -1,3 +1,4 @@
+import traceback
 from typing import Any, Optional, Dict
 from .routing import Router, RouteDefinition
 from .proxy import ProxyHandler
@@ -66,7 +67,7 @@ class Gateway:
 
         request_data = payload.model_dump()
         response_data = None
-        error_data = None
+        error_summary = None
 
         try:
             # Execute the core engine flow
@@ -74,20 +75,23 @@ class Gateway:
             return response_data
             
         except Exception as e:
-            error_data = e
+            # Capture full traceback for the auditor
+            error_summary = {
+                "message": str(e),
+                "type": e.__class__.__name__,
+                "traceback": traceback.format_exc()
+            }
             raise e
             
         finally:
             # 🛡 Unified Transaction Auditing
-            # We log EVERYTHING (request, response/error, context) in a single atomic record.
             if self.auditor:
-                # Clean up response data for logging if it's a Pydantic model
                 clean_res = response_data.model_dump() if hasattr(response_data, "model_dump") else response_data
                 
                 await self.auditor.log_transaction(
                     request=request_data,
                     response=clean_res,
-                    error=error_data,
+                    error=error_summary, # Now contains the full traceback!
                     context=context
                 )
 
