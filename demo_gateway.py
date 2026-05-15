@@ -24,18 +24,20 @@ class LapfundPayload(StaticPayload):
     UserDetails: Any = None
 
 # 3. Define some business logic hooks
-async def enrich_user_data(data: Any) -> UpstreamCreateUser:
+async def enrich_user_data(data: Any, **kwargs) -> UpstreamCreateUser:
     # Manual validation if it's a dict
     if isinstance(data, dict):
         data = UserDetails.model_validate(data)
     
     print(f"--- [Hook: before_request] Enriching {data.first_name} ---")
+    if "request_id" in kwargs:
+        print(f"    [Context] Request ID: {kwargs['request_id']}")
     return UpstreamCreateUser(
         name=f"{data.first_name} {data.last_name}",
         contact_email=data.email
     )
 
-async def format_response(data: dict) -> FrontendUserRes:
+async def format_response(data: dict, **kwargs) -> FrontendUserRes:
     print(f"--- [Hook: after_response] Formatting response for ID {data.get('id')} ---")
     return FrontendUserRes(
         id=data.get("id", 0),
@@ -113,7 +115,7 @@ async def main():
     app.proxy.request = AsyncMock(return_value=mock_response)
 
     try:
-        result = await app.route_request(payload)
+        result = await app.route_request(payload, request_id="REQ-12345")
         print("\nFinal Response to Frontend:")
         print(result.model_dump_json(indent=2))
 

@@ -18,7 +18,8 @@ class FlowEngine:
         self, 
         payload: StaticPayload, 
         route: RouteDefinition, 
-        incoming_headers: Optional[Dict[str, str]] = None
+        incoming_headers: Optional[Dict[str, str]] = None,
+        **kwargs
     ) -> Any:
         # 1. Extraction (Plucking)
         data = payload
@@ -30,7 +31,7 @@ class FlowEngine:
         # 2. Before Request Hook (Business Logic)
         if route.before_request:
             try:
-                data = await self._maybe_await(route.before_request(data))
+                data = await self._maybe_await(route.before_request(data, **kwargs))
             except Exception as e:
                 raise HookError(f"Error in before_request hook: {str(e)}") from e
 
@@ -51,7 +52,8 @@ class FlowEngine:
                 incoming_headers or {},
                 upstream_headers,
                 upstream_params,
-                request_json
+                request_json,
+                **kwargs
             )
 
         # 4. Proxy Call (or Mock)
@@ -84,7 +86,7 @@ class FlowEngine:
         # 5. After Response Hook
         if route.after_response:
             try:
-                response_data = await self._maybe_await(route.after_response(response_data))
+                response_data = await self._maybe_await(route.after_response(response_data, **kwargs))
             except Exception as e:
                 raise HookError(f"Error in after_response hook: {str(e)}") from e
 

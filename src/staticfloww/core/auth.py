@@ -71,7 +71,8 @@ class AuthHandler(ABC):
         incoming_headers: Dict[str, str],
         upstream_headers: Dict[str, str], 
         upstream_params: Dict[str, Any], 
-        upstream_json: Dict[str, Any]
+        upstream_json: Dict[str, Any],
+        **kwargs
     ) -> Tuple[Dict[str, str], Dict[str, Any], Dict[str, Any]]:
         pass
 
@@ -81,7 +82,7 @@ class APIKeyHandler(AuthHandler):
         self.name = name
         self.location = location
 
-    async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json):
+    async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json, **kwargs):
         if self.location == "header":
             upstream_headers[self.name] = self.key
         elif self.location == "param":
@@ -101,7 +102,7 @@ class PassthroughHandler(AuthHandler):
         self.upstream_name = upstream_name or header_name
         self.bearer_format = bearer_format
 
-    async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json):
+    async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json, **kwargs):
         val = incoming_headers.get(self.header_name) or incoming_headers.get(self.header_name.lower())
         if not val:
             raise AuthError(f"Missing required {self.header_name} header for passthrough")
@@ -126,7 +127,7 @@ class OAuth2Handler(AuthHandler):
         self._token: Optional[str] = None
         self._expires_at: float = 0
 
-    async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json):
+    async def apply(self, incoming_headers, upstream_headers, upstream_params, upstream_json, **kwargs):
         token = await self._get_valid_token()
         upstream_headers["Authorization"] = f"Bearer {token}"
         return upstream_headers, upstream_params, upstream_json

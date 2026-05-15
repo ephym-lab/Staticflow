@@ -18,7 +18,12 @@ class Gateway:
         """
         self.router.add_route(**kwargs)
 
-    async def route_request(self, payload: StaticPayload, headers: Optional[Dict[str, str]] = None) -> Any:
+    async def route_request(
+        self, 
+        payload: StaticPayload, 
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs
+    ) -> Any:
         """
         Main entry point to process a God Schema payload.
         """
@@ -39,7 +44,7 @@ class Gateway:
             await self.auditor.log_request(payload.model_dump(), context)
         
         try:
-            response_data = await self.engine.process(payload, route, incoming_headers=headers)
+            response_data = await self.engine.process(payload, route, incoming_headers=headers, **kwargs)
             
             # Auditing: Log Response
             if self.auditor:
