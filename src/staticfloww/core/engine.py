@@ -129,7 +129,8 @@ class FlowEngine:
                     json_data=request_json,
                     headers=upstream_headers,
                     params=upstream_params,
-                    request_format=route.request_format
+                    request_format=route.request_format,
+                    base_url=route.base_url
                 )
             else:
                 response = await self.proxy.request(
@@ -138,7 +139,8 @@ class FlowEngine:
                     json_data=request_json,
                     headers=upstream_headers,
                     params=upstream_params,
-                    request_format=route.request_format
+                    request_format=route.request_format,
+                    base_url=route.base_url
                 )
             
             # Check for HTTP errors
