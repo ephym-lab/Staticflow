@@ -28,7 +28,8 @@ async def test_proxy_base_url_override():
         # Should have switched to localhost!
         assert kwargs["url"] == "http://localhost:5000/logs"
 
-def test_proxy_url_joining_robustness():
+@pytest.mark.asyncio
+async def test_proxy_url_joining_robustness():
     """
     Ensure the proxy handles slashes safely regardless of input.
     """
@@ -37,9 +38,7 @@ def test_proxy_url_joining_robustness():
     
     # We'll mock the internal _client.request just to check the URL construction
     with patch("httpx.AsyncClient.request") as mock_req:
-        import asyncio
-        loop = asyncio.get_event_loop()
-        
         # Test trailing slash on base + leading slash on path
-        loop.run_until_complete(proxy.request("GET", "/test"))
+        await proxy.request("GET", "/test")
         assert mock_req.call_args[1]["url"] == "https://api.com/test"
+

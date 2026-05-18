@@ -108,11 +108,13 @@ class FlowEngine:
         
         if hasattr(route, "auth") and route.auth:
             # Note: request_json might be None here for GET
+            effective_base = route.base_url or self.proxy.base_url
             upstream_headers, upstream_params, request_json = await route.auth.apply(
                 incoming_headers or {},
                 upstream_headers,
                 upstream_params,
                 request_json or {},
+                base_url=effective_base,
                 **kwargs
             )
 
@@ -121,11 +123,20 @@ class FlowEngine:
             print(f"--- [Mock Mode] Returning mock data for {route.action} ---")
             response_data = route.mock_data
         else:
+            # Handle Dynamic Path Templates (e.g., /members/{id})
+            formatted_path = route.path
+            if "{" in formatted_path and "}" in formatted_path:
+                try:
+                    format_data = request_json if isinstance(request_json, dict) else {}
+                    formatted_path = formatted_path.format(**format_data)
+                except Exception:
+                    pass # Fallback to original path if formatting fails
+
             if hasattr(route, "resilience") and route.resilience:
                 response = await route.resilience.execute(
                     self.proxy.request,
                     method=route.method,
-                    path=route.path,
+                    path=formatted_path,
                     json_data=request_json,
                     headers=upstream_headers,
                     params=upstream_params,
@@ -135,7 +146,7 @@ class FlowEngine:
             else:
                 response = await self.proxy.request(
                     method=route.method,
-                    path=route.path,
+                    path=formatted_path,
                     json_data=request_json,
                     headers=upstream_headers,
                     params=upstream_params,

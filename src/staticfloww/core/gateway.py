@@ -12,12 +12,16 @@ class Gateway:
     Main Gateway class that coordinates the entire request lifecycle.
     Supports action-based routing and unified transaction auditing.
     """
-    def __init__(self, base_url: str, auditor: Optional[Any] = None):
+    _last_active_gateway = None
+
+    def __init__(self, base_url: str, auditor: Optional[Any] = None, auth: Optional[Any] = None):
         self.base_url = base_url.rstrip("/")
         self.router = Router()
         self.proxy = ProxyHandler(base_url=self.base_url)
         self.engine = FlowEngine(proxy=self.proxy)
         self.auditor = auditor
+        self.default_auth = auth
+        Gateway._last_active_gateway = self
         print(f"📡 [StaticFlow] Gateway Active -> {self.base_url}")
 
     def api_key_auth(self, **kwargs) -> APIKeyHandler:
@@ -33,8 +37,9 @@ class Gateway:
         Factory for OAuth2Handler that automatically prepends the gateway's base_url
         to the token_path.
         """
-        full_url = f"{self.base_url}/{token_path.lstrip('/')}"
-        return OAuth2Handler(token_url=full_url, **kwargs)
+        if token_path.startswith("http://") or token_path.startswith("https://"):
+            return OAuth2Handler(token_url=token_path, **kwargs)
+        return OAuth2Handler(token_path=token_path, base_url=self.base_url, **kwargs)
 
     def add_route(self, **kwargs):
         """
@@ -57,6 +62,10 @@ class Gateway:
         
         if not route:
             raise RouteNotFoundError(request_type)
+
+        # Automatically resolve route auth using Gateway's default auth if auth=True is specified
+        if getattr(route, "auth", None) is True:
+            route.auth = self.default_auth
 
         context = {
             "request_type": request_type,
@@ -84,7 +93,7 @@ class Gateway:
             raise e
             
         finally:
-            # 🛡 Unified Transaction Auditing
+            # Unified Transaction Auditing
             if self.auditor:
                 clean_res = response_data.model_dump() if hasattr(response_data, "model_dump") else response_data
                 
