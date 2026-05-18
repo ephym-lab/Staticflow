@@ -101,6 +101,9 @@ class FlowEngine:
         upstream_headers = {}
         upstream_params = {}
         
+        # Keep a copy of the request dictionary for dynamic path parameter formatting
+        path_format_data = request_json if isinstance(request_json, dict) else {}
+
         # For GET requests, the 'data' is typically query parameters
         if route.method.upper() == "GET" and isinstance(request_json, dict):
             upstream_params.update(request_json)
@@ -127,8 +130,11 @@ class FlowEngine:
             formatted_path = route.path
             if "{" in formatted_path and "}" in formatted_path:
                 try:
-                    format_data = request_json if isinstance(request_json, dict) else {}
-                    formatted_path = formatted_path.format(**format_data)
+                    formatted_path = formatted_path.format(**path_format_data)
+                    # Clean up path parameters from query parameters
+                    for key in path_format_data:
+                        if f"{{{key}}}" in route.path:
+                            upstream_params.pop(key, None)
                 except Exception:
                     pass # Fallback to original path if formatting fails
 

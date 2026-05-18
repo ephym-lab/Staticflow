@@ -6,7 +6,7 @@ from .core.auth import APIKeyHandler, PassthroughHandler, OAuth2Handler
 from .core.resilience import ResilienceStrategy, CircuitBreaker
 from .middleware.auditing import MemoryAuditor,MongoAuditor,BaseAuditor
 
-__version__ = "0.1.0"
+__version__ = "0.1.10"
 __all__ = [
     "Gateway", 
     "StaticPayload", 
